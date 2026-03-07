@@ -9,7 +9,7 @@ export enum FlightStatus {
   CANCELADO = 'CANCELADO'      // Voo cancelado ou não abastecido
 }
 
-export type OperatorStatus = 'DISPONÍVEL' | 'OCUPADO' | 'INTERVALO' | 'DESCONECTADO' | 'ENCHIMENTO';
+export type OperatorStatus = 'DISPONÍVEL' | 'OCUPADO' | 'INTERVALO' | 'DESCONECTADO' | 'ENCHIMENTO' | 'DESIGNADO';
 export type VehicleType = 'SERVIDOR' | 'CTA';
 export type VehicleStatus = 'DISPONÍVEL' | 'OCUPADO' | 'INATIVO' | 'ENCHIMENTO';
 

@@ -2,41 +2,28 @@ import React, { useState } from 'react';
 import { DetailedVehicle, VehicleType } from '../../types';
 import { Search, Plus, Trash2, Edit2, Save, X, Truck, Calendar, AlertTriangle, CheckCircle } from 'lucide-react';
 
-const MOCK_VEHICLES: DetailedVehicle[] = [
-  { 
-    id: '1', 
-    manufacturer: 'MERCEDES-BENZ', 
-    model: 'ATEGO 1719', 
-    type: 'SERVIDOR', 
-    plate: 'ABC-1234', 
-    fleetNumber: '2123', 
-    atve: 'ATVE-001', 
-    atveExpiry: new Date('2024-12-31'), 
-    inspectionWeekly: new Date('2024-05-20'), 
-    inspectionMonthly: new Date('2024-06-01'), 
-    inspectionSemiannual: new Date('2024-11-01'), 
-    inspectionAnnual: new Date('2025-01-01'), 
-    status: 'OPERACIONAL',
-    maxFlowRate: 1000,
-    hasPlatform: true,
-    counterInitial: 0,
-    counterFinal: 0,
-    maintenanceHistory: [],
-    nextMaintenance: new Date('2024-06-01'),
-    mileage: 50000,
-    engineHours: 2000,
-    fuelLevel: 80,
-    tirePressure: 100,
-    batteryLevel: 100
-  },
-  // ... more
-];
-
 export const FleetDatabase: React.FC = () => {
-  const [vehicles, setVehicles] = useState<DetailedVehicle[]>(MOCK_VEHICLES);
+  const [vehicles, setVehicles] = useState<DetailedVehicle[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentVehicle, setCurrentVehicle] = useState<Partial<DetailedVehicle>>({});
+
+  const parseVehicleDates = (v: any): DetailedVehicle => ({
+    ...v,
+    atveExpiry: new Date(v.atveExpiry),
+    inspectionWeekly: new Date(v.inspectionWeekly),
+    inspectionMonthly: new Date(v.inspectionMonthly),
+    inspectionSemiannual: new Date(v.inspectionSemiannual),
+    inspectionAnnual: new Date(v.inspectionAnnual),
+    nextMaintenance: new Date(v.nextMaintenance)
+  });
+
+  React.useEffect(() => {
+    fetch('/api/vehicles')
+      .then(res => res.json())
+      .then(data => setVehicles(data.map(parseVehicleDates)))
+      .catch(err => console.error('Failed to fetch vehicles:', err));
+  }, []);
 
   const filteredVehicles = vehicles.filter(v => 
     v.fleetNumber.includes(searchTerm) ||
@@ -44,12 +31,31 @@ export const FleetDatabase: React.FC = () => {
     v.atve.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (currentVehicle.id) {
-      setVehicles(prev => prev.map(v => v.id === currentVehicle.id ? currentVehicle as DetailedVehicle : v));
+      try {
+        const res = await fetch(`/api/vehicles/${currentVehicle.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(currentVehicle)
+        });
+        const updated = await res.json();
+        setVehicles(prev => prev.map(v => v.id === updated.id ? parseVehicleDates(updated) : v));
+      } catch (err) {
+        console.error('Failed to update vehicle:', err);
+      }
     } else {
-      const newVehicle = { ...currentVehicle, id: Date.now().toString(), status: 'OPERACIONAL' } as DetailedVehicle;
-      setVehicles(prev => [newVehicle, ...prev]);
+      try {
+        const res = await fetch('/api/vehicles', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...currentVehicle, status: 'DISPONÍVEL' })
+        });
+        const created = await res.json();
+        setVehicles(prev => [parseVehicleDates(created), ...prev]);
+      } catch (err) {
+        console.error('Failed to create vehicle:', err);
+      }
     }
     setIsModalOpen(false);
     setCurrentVehicle({});
@@ -60,9 +66,14 @@ export const FleetDatabase: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm('Excluir veículo?')) {
-      setVehicles(prev => prev.filter(v => v.id !== id));
+      try {
+        await fetch(`/api/vehicles/${id}`, { method: 'DELETE' });
+        setVehicles(prev => prev.filter(v => v.id !== id));
+      } catch (err) {
+        console.error('Failed to delete vehicle:', err);
+      }
     }
   };
 
@@ -73,9 +84,11 @@ export const FleetDatabase: React.FC = () => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'OPERACIONAL': return 'text-emerald-400 bg-emerald-500/20 border-emerald-500/30';
+      case 'DISPONÍVEL': return 'text-emerald-400 bg-emerald-500/20 border-emerald-500/30';
+      case 'OCUPADO': return 'text-blue-400 bg-blue-500/20 border-blue-500/30';
+      case 'ENCHIMENTO': return 'text-purple-400 bg-purple-500/20 border-purple-500/30';
+      case 'INATIVO': return 'text-red-400 bg-red-500/20 border-red-500/30';
       case 'MANUTENÇÃO': return 'text-amber-400 bg-amber-500/20 border-amber-500/30';
-      case 'BAIXADO': return 'text-red-400 bg-red-500/20 border-red-500/30';
       default: return 'text-slate-400 bg-slate-800 border-slate-700';
     }
   };
@@ -224,10 +237,12 @@ export const FleetDatabase: React.FC = () => {
                   </div>
                   <div>
                     <label className="block text-xs text-slate-500 uppercase font-bold mb-1">Status</label>
-                    <select className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-white" value={currentVehicle.status || 'OPERACIONAL'} onChange={e => setCurrentVehicle({...currentVehicle, status: e.target.value as any})}>
-                      <option value="OPERACIONAL">OPERACIONAL</option>
+                    <select className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-white" value={currentVehicle.status || 'DISPONÍVEL'} onChange={e => setCurrentVehicle({...currentVehicle, status: e.target.value as any})}>
+                      <option value="DISPONÍVEL">DISPONÍVEL</option>
+                      <option value="OCUPADO">OCUPADO</option>
+                      <option value="ENCHIMENTO">ENCHIMENTO</option>
+                      <option value="INATIVO">INATIVO</option>
                       <option value="MANUTENÇÃO">MANUTENÇÃO</option>
-                      <option value="BAIXADO">BAIXADO</option>
                     </select>
                   </div>
                 </div>

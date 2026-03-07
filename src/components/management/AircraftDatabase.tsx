@@ -2,20 +2,20 @@ import React, { useState } from 'react';
 import { AircraftType } from '../../types';
 import { Search, Plus, Trash2, Edit2, Save, X, Plane, Tag } from 'lucide-react';
 
-const MOCK_AIRCRAFT: AircraftType[] = [
-  { id: '1', manufacturer: 'BOEING', model: '737-800', prefix: 'PR-GGE', airline: 'GOL' },
-  { id: '2', manufacturer: 'AIRBUS', model: 'A320neo', prefix: 'PR-YRA', airline: 'AZUL' },
-  { id: '3', manufacturer: 'BOEING', model: '777-300ER', prefix: 'PT-MUA', airline: 'LATAM' },
-  // ... more
-];
-
 export const AircraftDatabase: React.FC = () => {
-  const [aircraft, setAircraft] = useState<AircraftType[]>(MOCK_AIRCRAFT);
+  const [aircraft, setAircraft] = useState<AircraftType[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isEditing, setIsEditing] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<AircraftType | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [newAircraft, setNewAircraft] = useState<Partial<AircraftType>>({});
+
+  React.useEffect(() => {
+    fetch('/api/aircraft')
+      .then(res => res.json())
+      .then(data => setAircraft(data))
+      .catch(err => console.error('Failed to fetch aircraft:', err));
+  }, []);
 
   const filteredAircraft = aircraft.filter(a => 
     a.prefix.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -23,9 +23,14 @@ export const AircraftDatabase: React.FC = () => {
     a.model.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm('Excluir aeronave?')) {
-      setAircraft(prev => prev.filter(a => a.id !== id));
+      try {
+        await fetch(`/api/aircraft/${id}`, { method: 'DELETE' });
+        setAircraft(prev => prev.filter(a => a.id !== id));
+      } catch (err) {
+        console.error('Failed to delete aircraft:', err);
+      }
     }
   };
 
@@ -34,26 +39,39 @@ export const AircraftDatabase: React.FC = () => {
     setEditForm(a);
   };
 
-  const handleSaveEdit = () => {
+  const handleSaveEdit = async () => {
     if (editForm) {
-      setAircraft(prev => prev.map(a => a.id === editForm.id ? editForm : a));
-      setIsEditing(null);
-      setEditForm(null);
+      try {
+        const res = await fetch(`/api/aircraft/${editForm.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(editForm)
+        });
+        const updated = await res.json();
+        setAircraft(prev => prev.map(a => a.id === updated.id ? updated : a));
+        setIsEditing(null);
+        setEditForm(null);
+      } catch (err) {
+        console.error('Failed to update aircraft:', err);
+      }
     }
   };
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     if (newAircraft.prefix && newAircraft.airline) {
-      const a: AircraftType = {
-        id: Date.now().toString(),
-        manufacturer: newAircraft.manufacturer || '',
-        model: newAircraft.model || '',
-        prefix: newAircraft.prefix,
-        airline: newAircraft.airline
-      };
-      setAircraft(prev => [a, ...prev]);
-      setIsCreating(false);
-      setNewAircraft({});
+      try {
+        const res = await fetch('/api/aircraft', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newAircraft)
+        });
+        const created = await res.json();
+        setAircraft(prev => [created, ...prev]);
+        setIsCreating(false);
+        setNewAircraft({});
+      } catch (err) {
+        console.error('Failed to create aircraft:', err);
+      }
     }
   };
 

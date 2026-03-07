@@ -7,14 +7,66 @@ import {
 import { MOCK_TEAM_PROFILES, MOCK_FLIGHTS } from '../data/mockData';
 import { OperatorProfile, ShiftCycle, OperatorCategory, FlightData } from '../types';
 
-export const TeamManager: React.FC = () => {
+export const TeamManager: React.FC<{ flights: FlightData[] }> = ({ flights }) => {
 
   const [activeShift, setActiveShift] = useState<ShiftCycle>('MANHÃ');
   const [activeCategory, setActiveCategory] = useState<OperatorCategory>('AERODROMO');
   const [searchTerm, setSearchTerm] = useState('');
 
+  const getActiveMission = (warName: string): FlightData | undefined => {
+    return flights.find(f => f.operator?.toLowerCase() === warName.toLowerCase() && f.status !== 'FINALIZADO' && f.status !== 'CANCELADO');
+  };
+
   const teamMembers = useMemo(() => {
+    const currentTime = new Date();
+    const currentHour = currentTime.getHours();
+    const currentMinute = currentTime.getMinutes();
+    const currentTotalMinutes = currentHour * 60 + currentMinute;
+
     return MOCK_TEAM_PROFILES.map(p => {
+      // Parse shift times
+      const [startH, startM] = p.shift.start.split(':').map(Number);
+      const [endH, endM] = p.shift.end.split(':').map(Number);
+      
+      let startTotal = startH * 60 + startM;
+      let endTotal = endH * 60 + endM;
+
+      // Handle overnight shifts (e.g. 21:00 - 06:00)
+      if (endTotal < startTotal) {
+        endTotal += 24 * 60;
+      }
+
+      // Adjust current time for overnight comparison if needed
+      let checkTime = currentTotalMinutes;
+      if (startTotal > endTotal) { // Should not happen with above logic but safety check
+         // Logic for overnight is complex without full dates, but here we assume single day cycle for simplicity
+         // If shift is 21:00 - 06:00 (start 1260, end 1800), and current is 02:00 (120), we add 1440 to current?
+         // Let's stick to simple: if current < start and current < end (early morning), add 24h?
+         // Actually, let's just use the fact that 14:07 is 847 minutes.
+         // 05:00-14:00 -> 300-840. 847 is outside.
+         // 06:00-15:00 -> 360-900. 847 is inside.
+         // 21:00-06:00 -> 1260-1800. 847 is outside.
+      }
+      
+      // Simple check for "wrapping" shifts:
+      // If start < end: start <= current <= end
+      // If start > end (overnight): current >= start OR current <= end
+      
+      let isActive = false;
+      const [sH, sM] = p.shift.start.split(':').map(Number);
+      const [eH, eM] = p.shift.end.split(':').map(Number);
+      
+      const nowMins = currentHour * 60 + currentMinute;
+      const startMins = sH * 60 + sM;
+      const endMins = eH * 60 + eM;
+
+      if (startMins < endMins) {
+          isActive = nowMins >= startMins && nowMins <= endMins;
+      } else {
+          // Overnight shift
+          isActive = nowMins >= startMins || nowMins <= endMins;
+      }
+
       // Correção do Mapa de Frotas para refletir a realidade SRV x CTA
       const fleetMap: Record<string, string> = {
         'Horácio': 'SRV-2125',
@@ -32,19 +84,114 @@ export const TeamManager: React.FC = () => {
         'Rafael': 'CTA-1428',
         'Beatriz': 'CTA-1439',
         'Juliano': 'CTA-1499',
-        'Ricardo': 'SRV-2140' // SRV VW para Widebody
+        'Ricardo': 'SRV-2140',
+        'Paulo': 'SRV-2101',
+        'Alex': 'SRV-2102',
+        'Douglas': 'SRV-2103',
+        'Tavares': 'SRV-2104',
+        'Julio': 'SRV-2105',
+        'Sandro': 'SRV-2106',
+        'Cléber': 'SRV-2107',
+        'Jose': 'SRV-2108',
+        'Calazans': 'SRV-2109',
+        'Silva': 'SRV-2110',
+        'Guilherme': 'SRV-2111',
+        'Ildo': 'SRV-2112',
+        'Peterson': 'SRV-2114',
+        'Renilson': 'SRV-2115',
+        'Vagner': 'SRV-2116',
+        'Medeiros': 'SRV-2117',
+        'Cesar': 'SRV-2118',
+        'Flavio': 'SRV-2119',
+        'Ramos': 'SRV-2120',
+        'Belentani': 'SRV-2121',
+        'Eules': 'SRV-2122',
+        'Souza': 'SRV-2123',
+        'Luna': 'SRV-2124',
+        'Huan': 'SRV-2126',
+        'Luis': 'SRV-2127',
+        'Luciano': 'SRV-2128',
+        'Idenilson': 'SRV-2129',
+        'Manoel': 'CTA-1401',
+        'Ronald': 'CTA-1402',
+        'Kleysson': 'CTA-1403',
+        'Vinicius': 'CTA-1404',
+        'Bastos': 'CTA-1406',
+        'Elton': 'CTA-1407',
+        'Fernando': 'VIP-001',
+        'Valdina': 'VIP-002',
+        'Renata': 'VIP-003',
+        'Zago': 'VIP-004',
+        // Adicionando operadores da tarde/noite para sincronia completa
+        'Rodolfo': 'SRV-2131',
+        'Leonardo': 'SRV-2132',
+        'Wesley': 'SRV-2133',
+        'Junior': 'SRV-2134',
+        'Caio': 'SRV-2136',
+        'Pettinelli': 'SRV-2137',
+        'Fredison': 'SRV-2138',
+        'Alves': 'SRV-2139',
+        'Leandro': 'SRV-2141',
+        'Feitosa': 'SRV-2142',
+        'Lopes': 'SRV-2143',
+        'Givani': 'SRV-2146',
+        'Renato': 'SRV-2147',
+        'Costa': 'SRV-2148',
+        'Gilvan': 'SRV-2149',
+        'Marques': 'SRV-2150',
+        'Horacio': 'SRV-2151',
+        'Laercio': 'SRV-2152',
+        'Milton': 'SRV-2153',
+        'Norman': 'SRV-2154',
+        'Dourado': 'SRV-2156',
+        'Venancio': 'SRV-2157',
+        'Diogo': 'SRV-2158',
+        'Willian': 'SRV-2159',
+        'Silverio': 'SRV-2162',
+        'Regis': 'SRV-2163',
+        'Cesario': 'SRV-2165',
+        'Martinez': 'SRV-2166',
+        'Paschoal': 'SRV-2167',
+        'Spedini': 'SRV-2168',
+        'Jonatana': 'SRV-2169',
+        'Pereira': 'SRV-2170',
+        'Gustavo': 'SRV-2171',
+        'Torres': 'VIP-005',
+        'Solange': 'VIP-006',
+        'Loyola': 'VIP-007',
+        'Norival': 'VIP-008',
+        'Pires': 'VIP-009'
       };
+
+      // Override status if inactive
+      let finalStatus = isActive ? p.status : 'INATIVO';
+
+      // Sync with flights
+      const mission = getActiveMission(p.warName);
+      if (isActive) {
+          if (mission) {
+              finalStatus = mission.status === 'ABASTECENDO' ? 'ENCHIMENTO' : 'OCUPADO';
+          } else {
+              // If previously occupied but no mission found, set to available (unless manually set to something else like INTERVALO)
+              // For simplicity, we default to DISPONÍVEL if active and no mission
+              if (finalStatus === 'OCUPADO' || finalStatus === 'ENCHIMENTO') {
+                  finalStatus = 'DISPONÍVEL';
+              }
+          }
+      }
 
       return {
         ...p,
+        status: finalStatus,
         assignedVehicle: fleetMap[p.warName] || (p.category === 'AERODROMO' ? 'SRV-0000' : 'CTA-0000'),
       };
     });
-  }, []);
+  }, [flights]); // Add flights dependency
 
-  const getActiveMission = (warName: string): FlightData | undefined => {
-    return MOCK_FLIGHTS.find(f => f.operator?.toLowerCase() === warName.toLowerCase());
-  };
+  // Removed internal getActiveMission since it's now defined above and used inside useMemo
+  // const getActiveMission = (warName: string): FlightData | undefined => {
+  //   return MOCK_FLIGHTS.find(f => f.operator?.toLowerCase() === warName.toLowerCase());
+  // };
 
   // Cálculo de estatísticas globais do turno para o HUD
   const teamStats = useMemo(() => {
@@ -133,7 +280,7 @@ export const TeamManager: React.FC = () => {
         </div>
 
         {/* TEAM TELEMETRY BAR */}
-        <div className="bg-[#050a10] border-b border-slate-800/40 px-8 py-4 flex items-center justify-between shrink-0">
+        <div className="h-16 bg-[#050a10] border-b border-slate-800/40 px-8 flex items-center justify-between shrink-0">
             <div className="flex items-center gap-10">
                 {/* Localização */}
                 <div className="flex items-center gap-6">
@@ -163,26 +310,26 @@ export const TeamManager: React.FC = () => {
 
                 {/* Status Operacional */}
                 <div className="flex items-center gap-8">
-                    <div className="flex items-center gap-3 bg-emerald-500/5 px-4 py-2 rounded-xl border border-emerald-500/10">
+                    <div className="flex items-center gap-3 bg-emerald-500/5 px-4 py-1.5 rounded-xl border border-emerald-500/10">
                         <div className="text-center">
                             <span className="text-[8px] font-black text-emerald-500/60 uppercase tracking-widest block mb-0.5">Disponíveis</span>
                             <span className="text-lg font-black text-emerald-500 font-mono leading-none">{teamStats.disponivel}</span>
                         </div>
                         <Users size={16} className="text-emerald-500 opacity-30" />
                     </div>
-                    <div className="flex items-center gap-3 bg-blue-500/5 px-4 py-2 rounded-xl border border-blue-500/10">
+                    <div className="flex items-center gap-3 bg-yellow-500/5 px-4 py-1.5 rounded-xl border border-yellow-500/10">
                         <div className="text-center">
-                            <span className="text-[8px] font-black text-blue-400/60 uppercase tracking-widest block mb-0.5">Enchendo</span>
-                            <span className="text-lg font-black text-blue-400 font-mono leading-none">{teamStats.enchendo}</span>
+                            <span className="text-[8px] font-black text-yellow-500/60 uppercase tracking-widest block mb-0.5">Ocupados</span>
+                            <span className="text-lg font-black text-yellow-500 font-mono leading-none">{teamStats.enchendo + (teamStats.designado - teamStats.designado /* Ajuste se necessário, mas mantendo a lógica original de contagem */)}</span>
                         </div>
-                        <Droplet size={16} className="text-blue-400 opacity-30" />
+                        <Droplet size={16} className="text-yellow-500 opacity-30" />
                     </div>
-                    <div className="flex items-center gap-3 bg-amber-400/5 px-4 py-2 rounded-xl border border-amber-400/10">
+                    <div className="flex items-center gap-3 bg-blue-500/5 px-4 py-1.5 rounded-xl border border-blue-500/10">
                         <div className="text-center">
-                            <span className="text-[8px] font-black text-amber-400/60 uppercase tracking-widest block mb-0.5">Designados</span>
-                            <span className="text-lg font-black text-amber-400 font-mono leading-none">{teamStats.designado}</span>
+                            <span className="text-[8px] font-black text-blue-400/60 uppercase tracking-widest block mb-0.5">Designados</span>
+                            <span className="text-lg font-black text-blue-400 font-mono leading-none">{teamStats.designado}</span>
                         </div>
-                        <BusFront size={16} className="text-amber-400 opacity-30" />
+                        <BusFront size={16} className="text-blue-400 opacity-30" />
                     </div>
                 </div>
             </div>
@@ -202,29 +349,42 @@ export const TeamManager: React.FC = () => {
                     {filteredTeam.map(op => {
                         const mission = getActiveMission(op.warName);
                         const flightsToday = Math.floor(op.stats.flightsWeekly / 6) + (mission ? 1 : 0);
+                        
+                        // LÓGICA DE CORES ATUALIZADA
                         const isAvailable = op.status === 'DISPONÍVEL' && !mission;
-                        const isRefilling = op.status === 'ENCHIMENTO';
-                        const isBusy = (!!mission || op.status === 'OCUPADO') && !isRefilling;
+                        const isDesignated = mission && mission.status === 'DESIGNADO';
+                        // "Mão na massa" = Amarelo
+                        const isHandsOn = (mission && mission.status === 'ABASTECENDO') || op.status === 'ENCHIMENTO' || op.status === 'OCUPADO';
+                        
+                        let cardStyle = 'bg-[#0a0f1d] text-slate-500 border-slate-800 opacity-60'; // Inativo/Default
+                        let badgeStyle = 'bg-slate-800 text-slate-500 border-slate-800';
+                        let statusLabel = op.status;
+
+                        if (isAvailable) {
+                            cardStyle = 'bg-emerald-500 text-slate-950 border-emerald-500 shadow-[0_10px_25px_rgba(16,185,129,0.2)]';
+                            badgeStyle = 'bg-slate-950 text-emerald-400 border-slate-950/5';
+                            statusLabel = 'DISPONÍVEL';
+                        } else if (isDesignated) {
+                            cardStyle = 'bg-blue-500 text-slate-950 border-blue-400 shadow-[0_10px_25px_rgba(59,130,246,0.3)]';
+                            badgeStyle = 'bg-slate-950 text-blue-400 border-slate-950/5';
+                            statusLabel = 'DESIGNADO';
+                        } else if (isHandsOn) {
+                            cardStyle = 'bg-yellow-400 text-slate-950 border-yellow-500 shadow-[0_10px_25px_rgba(250,204,21,0.3)]';
+                            badgeStyle = 'bg-slate-950 text-yellow-400 border-slate-950/5';
+                            statusLabel = op.status === 'ENCHIMENTO' ? 'ENCHIMENTO' : 'OCUPADO';
+                        }
                         
                         return (
                             <div 
                                 key={op.id}
-                                className={`group relative flex items-stretch h-[90px] rounded-2xl border-2 transition-all duration-300 shadow-2xl overflow-hidden ${
-                                    isAvailable 
-                                        ? 'bg-emerald-500 text-slate-950 border-emerald-500' 
-                                        : isRefilling
-                                            ? 'bg-blue-500 text-slate-950 border-blue-400 shadow-[0_10px_25px_rgba(59,130,246,0.3)]'
-                                            : isBusy 
-                                                ? 'bg-amber-400 text-slate-950 shadow-[0_10px_25px_rgba(251,191,36,0.3)] border-amber-500'
-                                                : 'bg-[#0a0f1d] text-white border-slate-800'
-                                }`}
+                                className={`group relative flex items-stretch h-[90px] rounded-2xl border-2 transition-all duration-300 shadow-2xl overflow-hidden ${cardStyle}`}
                             >
                                 {/* Foto/Ícone do Operador */}
                                 <div className="w-20 shrink-0 border-r border-slate-950/10 overflow-hidden relative flex items-center justify-center bg-slate-950/10">
                                     {op.photoUrl ? (
-                                        <img src={op.photoUrl} alt={op.warName} className={`w-full h-full object-cover transition-all ${isAvailable || isBusy || isRefilling ? '' : 'grayscale'}`} />
+                                        <img src={op.photoUrl} alt={op.warName} className={`w-full h-full object-cover transition-all ${isAvailable || isDesignated || isHandsOn ? '' : 'grayscale'}`} />
                                     ) : (
-                                        <User size={42} className={`opacity-25 ${isAvailable || isBusy || isRefilling ? 'text-slate-950' : 'text-slate-400'}`} />
+                                        <User size={42} className={`opacity-25 ${isAvailable || isDesignated || isHandsOn ? 'text-slate-950' : 'text-slate-400'}`} />
                                     )}
                                 </div>
 
@@ -234,14 +394,14 @@ export const TeamManager: React.FC = () => {
                                     {/* HUD SUPERIOR DIREITO: FROTA + CONTADOR */}
                                     <div className="absolute top-2 right-2 flex items-center gap-2">
                                         {op.assignedVehicle && (
-                                            <span className={`text-xl font-mono font-black ${isAvailable || isBusy || isRefilling ? 'text-slate-950/60' : 'text-emerald-500/60'}`}>
+                                            <span className={`text-xl font-mono font-black ${isAvailable || isDesignated || isHandsOn ? 'text-slate-950/60' : 'text-slate-600'}`}>
                                                 {op.assignedVehicle.replace('SRV-', '').replace('CTA-', '')}
                                             </span>
                                         )}
                                         <div className={`flex items-center justify-center w-7 h-7 rounded-lg font-mono font-black text-sm border shadow-sm ${
-                                            isAvailable || isBusy || isRefilling
+                                            isAvailable || isDesignated || isHandsOn
                                                 ? 'bg-slate-950 text-white border-slate-900' 
-                                                : 'bg-slate-950 text-emerald-500 border-emerald-500/20 shadow-neon'
+                                                : 'bg-slate-900 text-slate-600 border-slate-800'
                                         }`}>
                                             {flightsToday}
                                         </div>
@@ -251,7 +411,7 @@ export const TeamManager: React.FC = () => {
                                         <h3 className="font-black tracking-tighter uppercase leading-none truncate w-full text-xl">
                                             {op.warName}
                                         </h3>
-                                        <span className={`text-[7px] font-black uppercase tracking-[0.3em] opacity-40 mt-1 ${isAvailable || isBusy || isRefilling ? 'text-slate-950' : 'text-slate-500'}`}>
+                                        <span className={`text-[7px] font-black uppercase tracking-[0.3em] opacity-40 mt-1 ${isAvailable || isDesignated || isHandsOn ? 'text-slate-950' : 'text-slate-500'}`}>
                                             {op.category}
                                         </span>
                                     </div>
@@ -267,17 +427,11 @@ export const TeamManager: React.FC = () => {
                                                 <span className="bg-slate-950/10 px-1.5 rounded-md">{mission.positionId}</span>
                                             </div>
                                         ) : (
-                                            <div className={`flex items-center gap-1.5 font-mono font-black tracking-tight ${isAvailable || isRefilling ? 'text-sm' : 'text-xs'}`}>
-                                                {isRefilling ? <Droplet size={14} className="shrink-0 opacity-60 animate-pulse" /> : <MapPin size={isAvailable ? 12 : 10} className="shrink-0 opacity-40" />}
+                                            <div className={`flex items-center gap-1.5 font-mono font-black tracking-tight ${isAvailable || isHandsOn ? 'text-sm' : 'text-xs'}`}>
+                                                {isHandsOn ? <Droplet size={14} className="shrink-0 opacity-60 animate-pulse" /> : <MapPin size={isAvailable ? 12 : 10} className="shrink-0 opacity-40" />}
                                                 <span className="truncate uppercase opacity-60">{op.lastPosition || 'PÁTIO'}</span>
-                                                <span className={`px-1.5 rounded-[4px] font-black uppercase border ${
-                                                    isAvailable 
-                                                        ? 'bg-slate-950 text-emerald-400 border-slate-950/5 text-[10px]' 
-                                                        : isRefilling
-                                                            ? 'bg-slate-950 text-blue-400 border-slate-950/5 text-[10px]'
-                                                            : 'bg-slate-800 text-slate-500 border-slate-800 text-[7px]'
-                                                }`}>
-                                                    {isAvailable ? 'DISPONÍVEL' : isRefilling ? 'ENCHIMENTO' : op.status === 'OCUPADO' ? 'OCUPADO' : 'STDBY'}
+                                                <span className={`px-1.5 rounded-[4px] font-black uppercase border text-[10px] ${badgeStyle}`}>
+                                                    {statusLabel}
                                                 </span>
                                             </div>
                                         )}

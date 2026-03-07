@@ -18,7 +18,7 @@ import { DashboardHeader } from './components/DashboardHeader';
 import { 
   Plane, Settings, Sun, Moon, Maximize, Minimize, User, Table, 
   LogOut, Users, BusFront, MapPin, Activity,
-  Database, MessageSquare, FileBarChart
+  Database, MessageSquare, FileBarChart, ListOrdered
 } from 'lucide-react';
 
 const App: React.FC = () => {
@@ -35,6 +35,7 @@ const App: React.FC = () => {
   
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [isSidebarHovered, setIsSidebarHovered] = useState(false);
+  const [gridOpsInitialTab, setGridOpsInitialTab] = useState<'GERAL' | 'CHEGADA' | 'FILA' | 'DESIGNADOS' | 'ABASTECENDO' | 'FINALIZADO'>('GERAL');
 
   useEffect(() => {
     if (isDarkMode) {
@@ -96,18 +97,25 @@ const App: React.FC = () => {
 
   if (!isAuthenticated) return <LoginScreen onLogin={() => setIsAuthenticated(true)} />;
 
-  const NavButton = ({ target, icon: Icon, label }: { target: ViewState, icon: any, label: string }) => (
+  const handleSidebarNavigation = (target: ViewState, tab?: 'FILA') => {
+      setView(target);
+      if (tab) {
+          setGridOpsInitialTab(tab);
+      }
+  };
+
+  const NavButton = ({ target, icon: Icon, label, tab }: { target: ViewState, icon: any, label: string, tab?: 'FILA' }) => (
     <button 
-      onClick={() => setView(target)}
+      onClick={() => handleSidebarNavigation(target, tab)}
       className={`w-full flex items-center transition-all relative whitespace-nowrap overflow-hidden group h-14 
         hover:bg-emerald-500/[0.06] dark:hover:bg-emerald-500/[0.08] ${
-        view === target 
+        view === target && (!tab || gridOpsInitialTab === tab)
           ? 'text-emerald-500 dark:text-emerald-400 bg-emerald-500/[0.03]' 
           : 'text-slate-400 dark:text-slate-600 hover:text-white dark:hover:text-slate-300'
       }`}
     >
       <div className={`absolute left-0 w-[3px] transition-all duration-300 rounded-r-full ${
-        view === target 
+        view === target && (!tab || gridOpsInitialTab === tab)
           ? 'h-6 bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.8)] opacity-100' 
           : 'h-0 bg-slate-300 dark:bg-slate-800 opacity-0'
       }`}></div>
@@ -116,13 +124,13 @@ const App: React.FC = () => {
         <Icon 
           size={20} 
           className={`transition-all duration-300 ${
-              view === target ? 'drop-shadow-[0_0_5px_rgba(16,185,129,0.6)]' : 'group-hover:text-emerald-500'
+              view === target && (!tab || gridOpsInitialTab === tab) ? 'drop-shadow-[0_0_5px_rgba(16,185,129,0.6)]' : 'group-hover:text-emerald-500'
           }`} 
         />
       </div>
       
       <span className={`font-black text-[10px] uppercase tracking-[0.1em] transition-all duration-300 ${textVisibilityClass} ${
-          view === target ? 'text-white' : ''
+          view === target && (!tab || gridOpsInitialTab === tab) ? 'text-white' : ''
       }`}>
         {label}
       </span>
@@ -146,6 +154,7 @@ const App: React.FC = () => {
 
                 <nav className="py-4 space-y-1">
                   <NavButton target="GRID_OPS" icon={Table} label="Malha" />
+                  <NavButton target="GRID_OPS" icon={ListOrdered} label="Fila" tab="FILA" />
                   <NavButton target="RADAR" icon={Activity} label="Radar" />
                   <NavButton target="AERODROMO" icon={MapPin} label="Aeródromo" />
                   <NavButton target="OPERATORS" icon={BusFront} label="Frotas" />
@@ -186,12 +195,13 @@ const App: React.FC = () => {
                   onUpdateFlights={setGlobalFlights} 
                   vehicles={globalVehicles}
                   onNavigate={setView}
+                  initialTab={gridOpsInitialTab}
                 />
               )}
               {view === 'RADAR' && <Radar flights={globalFlights} />}
               {view === 'AERODROMO' && <Aerodromo />}
-              {view === 'OPERATORS' && <OperatorManager density={globalDensity} vehicles={globalVehicles} onUpdateVehicles={setGlobalVehicles} operators={MOCK_TEAM_PROFILES} />}
-              {view === 'TEAM' && <TeamManager />}
+              {view === 'OPERATORS' && <OperatorManager density={globalDensity} vehicles={globalVehicles} onUpdateVehicles={setGlobalVehicles} operators={MOCK_TEAM_PROFILES} flights={globalFlights} />}
+              {view === 'TEAM' && <TeamManager flights={globalFlights} />}
               {view === 'MESSAGES' && <MessageCenter />}
               {/* RELATÓRIOS AGORA RECEBEM OS DADOS GLOBAIS */}
               {view === 'REPORTS' && <ReportsView flights={globalFlights} />}

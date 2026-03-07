@@ -40,6 +40,7 @@ interface GridOpsProps {
     onUpdateFlights: React.Dispatch<React.SetStateAction<FlightData[]>>;
     vehicles: Vehicle[];
     onNavigate?: (view: any) => void;
+    initialTab?: Tab;
 }
 
 const parseTime = (timeStr: string) => {
@@ -120,8 +121,15 @@ const createNewLog = (type: LogType, message: string, author: string = 'GESTOR_M
     author
 });
 
-export const GridOps: React.FC<GridOpsProps> = ({ flights, onUpdateFlights, vehicles, onNavigate }) => {
-  const [activeTab, setActiveTab] = useState<Tab>('GERAL');
+export const GridOps: React.FC<GridOpsProps> = ({ flights, onUpdateFlights, vehicles, onNavigate, initialTab = 'GERAL' }) => {
+  const [activeTab, setActiveTab] = useState<Tab>(initialTab);
+  
+  useEffect(() => {
+      if (initialTab) {
+          setActiveTab(initialTab);
+      }
+  }, [initialTab]);
+
   const [selectedFlight, setSelectedFlight] = useState<FlightData | null>(null);
   const [chatFlight, setChatFlight] = useState<FlightData | null>(null);
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: null, direction: null });
@@ -198,6 +206,16 @@ export const GridOps: React.FC<GridOpsProps> = ({ flights, onUpdateFlights, vehi
                         logs: [...(f.logs || []), newLog]
                     };
                 }
+                
+                // Simulação de novas informações (ETA update, mensagens, etc)
+                if (Math.random() < 0.05) { // 5% chance per flight per 5s
+                    const randomChange = Math.random();
+                    if (randomChange < 0.3) {
+                        // Update ETA slightly
+                        // Logic omitted for brevity, keeping simple
+                    }
+                }
+
                 return f;
             });
         });
@@ -562,10 +580,26 @@ export const GridOps: React.FC<GridOpsProps> = ({ flights, onUpdateFlights, vehi
   // Filters operators based on Vehicle Compatibility (SRV vs CTA)
   const getEligibleOperators = (flight: FlightData) => {
       const isCtaRequired = flight.vehicleType === 'CTA';
+      
+      // Get all active missions to determine status
+      const activeMissions = flights.filter(f => f.status !== 'FINALIZADO' && f.status !== 'CANCELADO');
+
       return MOCK_TEAM_PROFILES.filter(op => {
           const isCtaCapable = op.category === 'ILHA' || op.category === 'VIP';
           if (isCtaRequired) return isCtaCapable;
           return !isCtaCapable; // Para SRV (AERODROMO)
+      }).map(op => {
+          // Find if operator has an active mission
+          const mission = activeMissions.find(m => m.operator?.toLowerCase() === op.warName.toLowerCase());
+          
+          let dynamicStatus = op.status;
+          if (mission) {
+              if (mission.status === 'ABASTECENDO') dynamicStatus = 'OCUPADO'; 
+              else if (mission.status === 'DESIGNADO') dynamicStatus = 'DESIGNADO';
+              else dynamicStatus = 'OCUPADO';
+          }
+          
+          return { ...op, status: dynamicStatus };
       });
   };
 
@@ -928,7 +962,7 @@ export const GridOps: React.FC<GridOpsProps> = ({ flights, onUpdateFlights, vehi
                                     ) : (
                                         <button 
                                             onClick={(e) => openAssignModal(row, e)}
-                                            className="w-full bg-slate-800/50 hover:bg-indigo-500/10 border border-slate-700 hover:border-indigo-500/30 text-slate-400 hover:text-indigo-400 rounded py-1 px-2 text-[9px] font-bold uppercase transition-all flex items-center justify-center gap-1.5"
+                                            className="w-full bg-slate-800/50 hover:bg-indigo-500 hover:text-white border border-slate-700 hover:border-indigo-400 hover:shadow-[0_0_15px_rgba(99,102,241,0.5)] hover:scale-105 active:scale-95 text-slate-400 rounded py-1 px-2 text-[9px] font-bold uppercase transition-all flex items-center justify-center gap-1.5"
                                         >
                                             <UserPlus size={10} /> Designar
                                         </button>
@@ -1062,7 +1096,7 @@ export const GridOps: React.FC<GridOpsProps> = ({ flights, onUpdateFlights, vehi
                                     ) : (
                                         <button 
                                             onClick={(e) => openAssignModal(row, e)}
-                                            className="w-full bg-slate-800/50 hover:bg-indigo-500/10 border border-slate-700 hover:border-indigo-500/30 text-slate-400 hover:text-indigo-400 rounded py-1 px-2 text-[9px] font-bold uppercase transition-all flex items-center justify-center gap-1.5"
+                                            className="w-full bg-slate-800/50 hover:bg-indigo-500 hover:text-white border border-slate-700 hover:border-indigo-400 hover:shadow-[0_0_15px_rgba(99,102,241,0.5)] hover:scale-105 active:scale-95 text-slate-400 rounded py-1 px-2 text-[9px] font-bold uppercase transition-all flex items-center justify-center gap-1.5"
                                         >
                                             <UserPlus size={10} /> Designar
                                         </button>
@@ -1204,7 +1238,7 @@ export const GridOps: React.FC<GridOpsProps> = ({ flights, onUpdateFlights, vehi
                                                   if (activeTab === 'DESIGNADOS') {
                                                       return (
                                                           <>
-                                                              <button onClick={(e) => { e.stopPropagation(); setConfirmStartModalFlight(row); setOpenMenuId(null); }} className={btnClass}>
+                                                              <button onClick={(e) => { e.stopPropagation(); setConfirmStartModalFlight(row); setOpenMenuId(null); }} className="w-full text-left px-3 py-2 text-slate-300 hover:bg-blue-600 hover:text-white hover:shadow-[0_0_15px_rgba(37,99,235,0.5)] hover:scale-105 active:scale-95 rounded flex items-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
                                                                   <Play size={14} /> Abastecendo
                                                               </button>
                                                               <button onClick={(e) => { e.stopPropagation(); setConfirmRemoveOperatorFlight(row); setOpenMenuId(null); }} className={btnClass}>
@@ -1222,7 +1256,7 @@ export const GridOps: React.FC<GridOpsProps> = ({ flights, onUpdateFlights, vehi
                                                       return (
                                                           <>
                                                               {pinBtn}
-                                                              <button onClick={(e) => { e.stopPropagation(); setConfirmFinishModalFlight(row); setOpenMenuId(null); }} className={btnClass}>
+                                                              <button onClick={(e) => { e.stopPropagation(); setConfirmFinishModalFlight(row); setOpenMenuId(null); }} className="w-full text-left px-3 py-2 text-slate-300 hover:bg-emerald-600 hover:text-white hover:shadow-[0_0_15px_rgba(16,185,129,0.5)] hover:scale-105 active:scale-95 rounded flex items-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
                                                                   <CheckCircle size={14} /> Finalizar
                                                               </button>
                                                               {obsBtn}

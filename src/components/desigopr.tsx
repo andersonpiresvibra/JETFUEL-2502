@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { OperatorProfile, FlightData, Vehicle } from '../types';
-import { UserPlus, AlertTriangle } from 'lucide-react';
+import { UserPlus, AlertTriangle, X, Check, User, Clock, Briefcase } from 'lucide-react';
 
 interface DesigOprProps {
     isOpen: boolean;
@@ -11,8 +11,11 @@ interface DesigOprProps {
     onConfirm: (operatorId: string) => void;
 }
 
+type Tab = 'DISPONIVEIS' | 'DESIGNADOS' | 'OCUPADOS';
+
 export const DesigOpr: React.FC<DesigOprProps> = ({ isOpen, onClose, flight, vehicle, operators, onConfirm }) => {
     const [selectedOperatorId, setSelectedOperatorId] = useState<string | null>(null);
+    const [activeTab, setActiveTab] = useState<Tab>('DISPONIVEIS');
 
     const handleConfirm = () => {
         if (selectedOperatorId) {
@@ -26,15 +29,37 @@ export const DesigOpr: React.FC<DesigOprProps> = ({ isOpen, onClose, flight, veh
         onClose();
     };
 
+    // Reset tab when opening
+    useEffect(() => {
+        if (isOpen) {
+            setActiveTab('DISPONIVEIS');
+            setSelectedOperatorId(null);
+        }
+    }, [isOpen]);
+
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.key === 'Enter' && isOpen && selectedOperatorId) {
                 handleConfirm();
             }
+            if (e.key === 'Escape' && isOpen) {
+                handleClose();
+            }
         };
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [isOpen, selectedOperatorId, handleConfirm]);
+
+    const categorizedOperators = useMemo(() => {
+        return {
+            DISPONIVEIS: operators.filter(op => op.status === 'DISPONÍVEL'),
+            DESIGNADOS: operators.filter(op => op.status === 'DESIGNADO' || (op.status as any) === 'ALOCADO'), // Assuming DESIGNADO status exists or mapping logic handles it
+            OCUPADOS: operators.filter(op => op.status === 'OCUPADO' || op.status === 'ENCHIMENTO'),
+        };
+    }, [operators]);
+
+    // Fallback logic if statuses aren't exactly matching, or to ensure everyone is somewhere
+    const currentList = categorizedOperators[activeTab];
 
     if (!isOpen || (!flight && !vehicle)) return null;
 
@@ -47,91 +72,154 @@ export const DesigOpr: React.FC<DesigOprProps> = ({ isOpen, onClose, flight, veh
     }
 
     return (
-        <div className="fixed inset-0 z-[9999] bg-black/80 backdrop-blur-sm flex items-center justify-center animate-in fade-in">
-            <div className="bg-slate-900 border border-indigo-500/30 w-full max-w-sm rounded-2xl p-6 shadow-[0_0_50px_rgba(79,70,229,0.2)] animate-in zoom-in-95 flex flex-col">
-                
-                <div className="flex items-center gap-3 mb-5 border-b border-indigo-500/20 pb-4">
-                    <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-500 border border-indigo-500/30">
-                        <UserPlus size={20} />
+        <div 
+            className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm flex items-center justify-center animate-in fade-in duration-200"
+            onClick={handleClose}
+        >
+            <div 
+                className="bg-[#0f172a] border border-slate-800 w-full max-w-md rounded-xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200"
+                onClick={e => e.stopPropagation()}
+            >
+                {/* HEADER FINO */}
+                <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800 bg-[#020617]">
+                    <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-500 border border-indigo-500/20">
+                            <UserPlus size={16} />
+                        </div>
+                        <div>
+                            <h3 className="text-sm font-black text-white uppercase tracking-tight leading-none">{title}</h3>
+                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-0.5">
+                                {subtitle}
+                            </p>
+                        </div>
                     </div>
-                    <div>
-                        <h3 className="text-base font-black text-white uppercase tracking-tight">{title}</h3>
-                        <p className="text-[9px] font-bold text-indigo-400 uppercase tracking-widest">
-                            {subtitle}
-                        </p>
-                    </div>
+                    <button 
+                        onClick={handleClose}
+                        className="text-slate-500 hover:text-white transition-colors p-1 rounded-md hover:bg-slate-800"
+                    >
+                        <X size={18} />
+                    </button>
                 </div>
 
-                <div className="space-y-2.5 mb-6 max-h-64 overflow-y-auto custom-scrollbar pr-2">
-                    <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest block">Equipe Compatível Disponível</span>
-                    
-                    {operators.length > 0 ? operators.map(op => {
-                        const isBusy = op.status !== 'DISPONÍVEL';
-                        const isSelected = selectedOperatorId === op.id;
+                {/* TABS */}
+                <div className="flex border-b border-slate-800 bg-slate-900/50">
+                    {(['DISPONIVEIS', 'DESIGNADOS', 'OCUPADOS'] as Tab[]).map(tab => {
+                        const count = categorizedOperators[tab].length;
+                        const isActive = activeTab === tab;
                         
+                        let activeColor = 'text-emerald-500 border-emerald-500';
+                        if (tab === 'DESIGNADOS') activeColor = 'text-blue-500 border-blue-500';
+                        if (tab === 'OCUPADOS') activeColor = 'text-amber-500 border-amber-500';
+
                         return (
-                            <button 
-                                key={op.id}
-                                onClick={() => setSelectedOperatorId(op.id)}
-                                className={`w-full flex items-center justify-between px-3 py-2 rounded-xl border transition-all ${
-                                    isSelected 
-                                        ? 'bg-indigo-500 text-white border-indigo-400 shadow-lg' 
-                                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
+                            <button
+                                key={tab}
+                                onClick={() => setActiveTab(tab)}
+                                className={`flex-1 py-3 text-[10px] font-black uppercase tracking-wider border-b-2 transition-all flex items-center justify-center gap-2 ${
+                                    isActive 
+                                        ? `bg-slate-900 ${activeColor}` 
+                                        : 'border-transparent text-slate-500 hover:text-slate-300 hover:bg-slate-800/50'
                                 }`}
                             >
-                                <div className="flex items-center gap-3">
-                                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-[10px] font-bold ${
-                                        isSelected ? 'bg-white text-indigo-600' : 'bg-slate-900 text-slate-500'
-                                    }`}>
-                                        {op.warName.charAt(0)}
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <div className="text-[11px] font-black uppercase">{op.warName}</div>
-                                        <div className={`text-[7px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-sm ${
-                                            isSelected ? 'bg-indigo-400/30 text-indigo-100' : isBusy ? 'bg-amber-500/10 text-amber-500' : 'bg-emerald-500/10 text-emerald-500'
-                                        }`}>
-                                            {isBusy ? op.status : 'DISPONÍVEL'}
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                {isBusy && (
-                                    <AlertTriangle size={12} className={isSelected ? 'text-indigo-200' : 'text-amber-500'} />
-                                )}
+                                {tab === 'DISPONIVEIS' && <Check size={12} />}
+                                {tab === 'DESIGNADOS' && <Briefcase size={12} />}
+                                {tab === 'OCUPADOS' && <Clock size={12} />}
+                                {tab}
+                                <span className={`px-1.5 py-0.5 rounded text-[9px] ${isActive ? 'bg-slate-800' : 'bg-slate-800/50'}`}>
+                                    {count}
+                                </span>
                             </button>
                         );
-                    }) : (
-                        <div className="text-center py-4 text-slate-500 text-[10px] font-bold uppercase tracking-widest">
-                            Nenhum operador disponível
+                    })}
+                </div>
+
+                {/* LISTA DE OPERADORES */}
+                <div className="flex-1 p-4 min-h-[300px] max-h-[400px] overflow-y-auto custom-scrollbar bg-[#0f172a]">
+                    {currentList.length > 0 ? (
+                        <div className="grid grid-cols-1 gap-2">
+                            {currentList.map(op => {
+                                const isSelected = selectedOperatorId === op.id;
+                                const isBusy = op.status !== 'DISPONÍVEL';
+                                
+                                let statusColor = 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20';
+                                if (op.status === 'DESIGNADO') statusColor = 'text-blue-500 bg-blue-500/10 border-blue-500/20';
+                                if (op.status === 'OCUPADO' || op.status === 'ENCHIMENTO') statusColor = 'text-amber-500 bg-amber-500/10 border-amber-500/20';
+
+                                return (
+                                    <button 
+                                        key={op.id}
+                                        onClick={() => setSelectedOperatorId(op.id)}
+                                        className={`group w-full flex items-center justify-between px-4 py-3 rounded-xl border transition-all relative overflow-hidden ${
+                                            isSelected 
+                                                ? 'bg-indigo-600 border-indigo-500 shadow-lg shadow-indigo-900/20' 
+                                                : 'bg-slate-900/50 border-slate-800 hover:border-slate-700 hover:bg-slate-800'
+                                        }`}
+                                    >
+                                        <div className="flex items-center gap-4 relative z-10">
+                                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-sm font-black border ${
+                                                isSelected 
+                                                    ? 'bg-white text-indigo-600 border-white' 
+                                                    : 'bg-slate-950 text-slate-400 border-slate-800 group-hover:border-slate-600'
+                                            }`}>
+                                                {op.photoUrl ? (
+                                                    <img src={op.photoUrl} alt={op.warName} className="w-full h-full object-cover rounded-lg" />
+                                                ) : (
+                                                    op.warName.charAt(0)
+                                                )}
+                                            </div>
+                                            <div className="text-left">
+                                                <div className={`text-xs font-black uppercase tracking-wide ${isSelected ? 'text-white' : 'text-slate-200'}`}>
+                                                    {op.warName}
+                                                </div>
+                                                <div className="flex items-center gap-2 mt-1">
+                                                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${isSelected ? 'bg-indigo-500 text-indigo-100 border-indigo-400' : statusColor}`}>
+                                                        {op.status}
+                                                    </span>
+                                                    {op.assignedVehicle && (
+                                                        <span className={`text-[9px] font-mono opacity-60 ${isSelected ? 'text-indigo-200' : 'text-slate-500'}`}>
+                                                            {op.assignedVehicle}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        {isSelected && (
+                                            <div className="absolute right-4 top-1/2 -translate-y-1/2 z-10">
+                                                <div className="w-6 h-6 rounded-full bg-white text-indigo-600 flex items-center justify-center shadow-sm">
+                                                    <Check size={14} strokeWidth={4} />
+                                                </div>
+                                            </div>
+                                        )}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    ) : (
+                        <div className="h-full flex flex-col items-center justify-center text-slate-600 gap-3 py-10">
+                            <div className="w-12 h-12 rounded-full bg-slate-900 flex items-center justify-center">
+                                <User size={20} className="opacity-20" />
+                            </div>
+                            <span className="text-[10px] font-bold uppercase tracking-widest">Nenhum operador nesta categoria</span>
                         </div>
                     )}
                 </div>
 
-                {selectedOperatorId && (() => {
-                    const op = operators.find(o => o.id === selectedOperatorId);
-                    return op && op.status !== 'DISPONÍVEL' ? (
-                        <div className="bg-amber-500/10 border border-amber-500/30 p-2.5 rounded-lg mb-5 flex items-start gap-2">
-                            <AlertTriangle size={14} className="text-amber-500 shrink-0 mt-0.5" />
-                            <p className="text-[9px] text-amber-200 leading-relaxed font-bold">
-                                ATENÇÃO: O operador {op.warName} está atualmente {op.status}. Confirmar a designação criará uma fila na tarefa dele.
-                            </p>
-                        </div>
-                    ) : null;
-                })()}
-
-                <div className="flex gap-2 mt-auto">
+                {/* FOOTER */}
+                <div className="p-4 border-t border-slate-800 bg-[#020617] flex gap-3">
                     <button 
                         onClick={handleClose}
-                        className="flex-1 py-2.5 rounded-xl border border-slate-700 text-slate-400 font-bold text-[10px] hover:bg-slate-800 transition-all uppercase"
+                        className="flex-1 py-3 rounded-lg border border-slate-700 text-slate-400 font-bold text-[10px] hover:bg-slate-800 hover:text-white transition-all uppercase tracking-wider"
                     >
                         Cancelar
                     </button>
                     <button 
                         onClick={handleConfirm}
                         disabled={!selectedOperatorId}
-                        className="flex-1 py-2.5 rounded-xl bg-indigo-500 text-white font-black text-[10px] hover:bg-indigo-400 transition-all uppercase shadow-lg shadow-indigo-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="flex-1 py-3 rounded-lg bg-indigo-600 text-white font-black text-[10px] hover:bg-indigo-500 transition-all uppercase tracking-wider shadow-lg shadow-indigo-600/20 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none flex items-center justify-center gap-2"
                     >
-                        Confirmar
+                        <span>Confirmar Designação</span>
+                        <Check size={14} />
                     </button>
                 </div>
             </div>

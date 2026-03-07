@@ -2,21 +2,20 @@ import React, { useState } from 'react';
 import { StaticFlight } from '../../types';
 import { Search, Plus, Trash2, Edit2, Save, X, Plane } from 'lucide-react';
 
-// Mock Data
-const MOCK_FLIGHTS: StaticFlight[] = [
-  { id: '1', airline: 'LATAM', flightNumber: 'LA-8039', destination: 'SPJC', city: 'LIMA' },
-  { id: '2', airline: 'GOL', flightNumber: 'G3-1234', destination: 'SBGR', city: 'GUARULHOS' },
-  { id: '3', airline: 'AZUL', flightNumber: 'AD-4567', destination: 'SBRJ', city: 'RIO DE JANEIRO' },
-  // ... add more as needed
-];
-
 export const FlightDatabase: React.FC = () => {
-  const [flights, setFlights] = useState<StaticFlight[]>(MOCK_FLIGHTS);
+  const [flights, setFlights] = useState<StaticFlight[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isEditing, setIsEditing] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<StaticFlight | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [newFlight, setNewFlight] = useState<Partial<StaticFlight>>({});
+
+  React.useEffect(() => {
+    fetch('/api/flights')
+      .then(res => res.json())
+      .then(data => setFlights(data))
+      .catch(err => console.error('Failed to fetch flights:', err));
+  }, []);
 
   const filteredFlights = flights.filter(f => 
     f.flightNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -24,9 +23,14 @@ export const FlightDatabase: React.FC = () => {
     f.airline.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm('Tem certeza que deseja excluir este voo?')) {
-      setFlights(prev => prev.filter(f => f.id !== id));
+      try {
+        await fetch(`/api/flights/${id}`, { method: 'DELETE' });
+        setFlights(prev => prev.filter(f => f.id !== id));
+      } catch (err) {
+        console.error('Failed to delete flight:', err);
+      }
     }
   };
 
@@ -35,26 +39,39 @@ export const FlightDatabase: React.FC = () => {
     setEditForm(flight);
   };
 
-  const handleSaveEdit = () => {
+  const handleSaveEdit = async () => {
     if (editForm) {
-      setFlights(prev => prev.map(f => f.id === editForm.id ? editForm : f));
-      setIsEditing(null);
-      setEditForm(null);
+      try {
+        const res = await fetch(`/api/flights/${editForm.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(editForm)
+        });
+        const updated = await res.json();
+        setFlights(prev => prev.map(f => f.id === updated.id ? updated : f));
+        setIsEditing(null);
+        setEditForm(null);
+      } catch (err) {
+        console.error('Failed to update flight:', err);
+      }
     }
   };
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     if (newFlight.flightNumber && newFlight.airline) {
-      const flight: StaticFlight = {
-        id: Date.now().toString(),
-        airline: newFlight.airline,
-        flightNumber: newFlight.flightNumber,
-        destination: newFlight.destination || '',
-        city: newFlight.city || ''
-      };
-      setFlights(prev => [flight, ...prev]);
-      setIsCreating(false);
-      setNewFlight({});
+      try {
+        const res = await fetch('/api/flights', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newFlight)
+        });
+        const created = await res.json();
+        setFlights(prev => [created, ...prev]);
+        setIsCreating(false);
+        setNewFlight({});
+      } catch (err) {
+        console.error('Failed to create flight:', err);
+      }
     }
   };
 

@@ -4,7 +4,7 @@ import {
     User, Layers, ShieldCheck, ShieldAlert, Wrench,
     LayoutGrid, List, ChevronUp, ChevronDown, Power
 } from 'lucide-react';
-import { Vehicle, VehicleType, VehicleStatus, OperatorProfile } from '../types';
+import { Vehicle, VehicleType, VehicleStatus, OperatorProfile, FlightData } from '../types';
 import { VehicleActionModal } from './VehicleActionModal';
 
 interface OperatorManagerProps {
@@ -12,9 +12,10 @@ interface OperatorManagerProps {
   vehicles: Vehicle[];
   onUpdateVehicles: (vehicles: Vehicle[]) => void;
   operators: OperatorProfile[];
+  flights: FlightData[];
 }
 
-export const OperatorManager: React.FC<OperatorManagerProps> = ({ density, vehicles, onUpdateVehicles, operators }) => {
+export const OperatorManager: React.FC<OperatorManagerProps> = ({ density, vehicles, onUpdateVehicles, operators, flights }) => {
   const [activeTab, setActiveTab] = useState<VehicleType>('SERVIDOR');
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<'GRID' | 'TABLE'>('GRID');
@@ -31,8 +32,39 @@ export const OperatorManager: React.FC<OperatorManagerProps> = ({ density, vehic
     return Array.from(set);
   }, [vehicles]);
 
-    const filteredVehicles = useMemo(() => {
-    return vehicles.filter(v => {
+  // Sync vehicles with flights
+  const syncedVehicles = useMemo(() => {
+      return vehicles.map(v => {
+          // Find if this vehicle is assigned to an active flight
+          const activeFlight = flights.find(f => f.fleet === v.id && f.status !== 'FINALIZADO' && f.status !== 'CANCELADO');
+          
+          if (activeFlight) {
+              return {
+                  ...v,
+                  status: activeFlight.status === 'ABASTECENDO' ? 'ENCHIMENTO' : 'OCUPADO',
+                  operatorName: activeFlight.operator || v.operatorName,
+                  currentPosition: activeFlight.positionId || v.currentPosition
+              } as Vehicle;
+          }
+          
+          // If not in active flight, but was marked occupied, check if we should free it?
+          // For now, let's assume if no flight, it reverts to available or keeps manual status if not flight-related
+          // But user asked for sync. So if no flight, it should probably be available if it was occupied by flight.
+          if (v.status === 'OCUPADO' || v.status === 'ENCHIMENTO') {
+               return {
+                   ...v,
+                   status: 'DISPONÍVEL',
+                   // Keep operator name if assigned manually, or clear it? 
+                   // Usually operator stays with vehicle.
+               } as Vehicle;
+          }
+
+          return v;
+      });
+  }, [vehicles, flights]);
+
+  const filteredVehicles = useMemo(() => {
+    return syncedVehicles.filter(v => {
       const matchesTab = v.type === activeTab;
       const lowerSearchTerm = searchTerm.toLowerCase();
       const matchesSearch = 
@@ -304,7 +336,10 @@ export const OperatorManager: React.FC<OperatorManagerProps> = ({ density, vehic
                         {vehicle.operatorName ? (
                           <>
                             <div className="w-8 h-8 rounded-full bg-slate-700"></div>
-                            <span className="text-sm font-black text-white uppercase truncate">{vehicle.operatorName}</span>
+                            <div className="flex flex-col">
+                                <span className="text-sm font-black text-white uppercase truncate">{vehicle.operatorName}</span>
+                                <span className="text-[9px] font-bold text-slate-500 uppercase">{vehicle.id} - {vehicle.status}</span>
+                            </div>
                           </>
                         ) : (
                           <button onClick={() => setSelectedVehicle(vehicle)} className="text-xs font-black text-slate-600 uppercase hover:text-amber-500 transition-colors">DESIGNAR</button>
@@ -443,7 +478,10 @@ export const OperatorManager: React.FC<OperatorManagerProps> = ({ density, vehic
                     <td className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase">{v.manufacturer}</td>
                     <td className="px-4 py-3 text-xs font-medium text-white flex items-center gap-2">
                        <div className="w-6 h-6 rounded-full bg-slate-700 flex-shrink-0"></div>
-                      {v.operatorName || <span className='text-slate-600 italic'>N/D</span>}
+                       <div>
+                           <div className="font-black uppercase">{v.operatorName || <span className='text-slate-600 italic'>N/D</span>}</div>
+                           {v.operatorName && <div className="text-[9px] font-bold text-slate-500 uppercase">{v.id} - {v.status}</div>}
+                       </div>
                     </td>
                     <td className="px-4 py-3 text-[10px] font-black text-blue-400 font-mono">{v.currentPosition || '--'}</td>
                     

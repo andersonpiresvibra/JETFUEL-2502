@@ -18,31 +18,20 @@ interface ManagedOperator {
   americanId?: string;
 }
 
-const MOCK_OPERATORS: ManagedOperator[] = [
-  { 
-    id: '1', 
-    fullName: 'Anderson Horácio Pires', 
-    warName: 'Horácio', 
-    companyId: 'FUNC-1234', 
-    gruId: 'GRU-9876', 
-    vestNumber: '101', 
-    role: 'LÍDER', 
-    shift: 'MANHÃ', 
-    entryTime: '06:00', 
-    exitTime: '14:00', 
-    allowedAirlines: ['LATAM', 'GOL'], 
-    status: 'ATIVO' 
-  },
-  // ... more
-];
-
 const AIRLINES_LIST = ['LATAM', 'GOL', 'AZUL', 'AMERICAN', 'UNITED', 'DELTA', 'TAP', 'AIR FRANCE', 'KLM', 'LUFTHANSA', 'BRITISH', 'QATAR', 'EMIRATES'];
 
 export const OperatorDatabase: React.FC = () => {
-  const [operators, setOperators] = useState<ManagedOperator[]>(MOCK_OPERATORS);
+  const [operators, setOperators] = useState<ManagedOperator[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentOperator, setCurrentOperator] = useState<Partial<ManagedOperator>>({});
+
+  React.useEffect(() => {
+    fetch('/api/operators')
+      .then(res => res.json())
+      .then(data => setOperators(data))
+      .catch(err => console.error('Failed to fetch operators:', err));
+  }, []);
 
   const filteredOperators = operators.filter(op => 
     op.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -50,14 +39,33 @@ export const OperatorDatabase: React.FC = () => {
     op.companyId.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (currentOperator.id) {
       // Edit
-      setOperators(prev => prev.map(op => op.id === currentOperator.id ? currentOperator as ManagedOperator : op));
+      try {
+        const res = await fetch(`/api/operators/${currentOperator.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(currentOperator)
+        });
+        const updated = await res.json();
+        setOperators(prev => prev.map(op => op.id === updated.id ? updated : op));
+      } catch (err) {
+        console.error('Failed to update operator:', err);
+      }
     } else {
       // Create
-      const newOp = { ...currentOperator, id: Date.now().toString(), status: 'ATIVO' } as ManagedOperator;
-      setOperators(prev => [newOp, ...prev]);
+      try {
+        const res = await fetch('/api/operators', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...currentOperator, status: 'ATIVO' })
+        });
+        const created = await res.json();
+        setOperators(prev => [created, ...prev]);
+      } catch (err) {
+        console.error('Failed to create operator:', err);
+      }
     }
     setIsModalOpen(false);
     setCurrentOperator({});
@@ -68,9 +76,14 @@ export const OperatorDatabase: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm('Excluir operador?')) {
-      setOperators(prev => prev.filter(op => op.id !== id));
+      try {
+        await fetch(`/api/operators/${id}`, { method: 'DELETE' });
+        setOperators(prev => prev.filter(op => op.id !== id));
+      } catch (err) {
+        console.error('Failed to delete operator:', err);
+      }
     }
   };
 
